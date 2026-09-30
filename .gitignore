@@ -1,0 +1,16 @@
+# Кэш Python
+__pycache__/
+*.py[cod]
+
+# Виртуальное окружение
+venv/
+env/
+.venv/
+
+# Настройки IDE
+.idea/
+.vscode/
+
+# Файлы операционной системы
+.DS_Store
+Thumbs.db

@@ -2,9 +2,19 @@ import tkinter as tk
 import getpass
 import socket
 import argparse
-
+import xml.etree.ElementTree as ET
+from datetime import datetime
 
 def parse_command(line):
+    """
+    Разбирает строку на команду и аргументы по пробелам.
+
+    Args:
+        line (str): строка ввода.
+
+    Returns:
+        tuple: (команда, список аргументов).
+    """
     parts = line.split()
     if not parts:
         return "", []
@@ -12,8 +22,17 @@ def parse_command(line):
     args = parts[1:]
     return command, args
 
-
 def run_command(command, args):
+    """
+    Выполняет команду. Пока — заглушки.
+
+    Args:
+        command (str): имя команды.
+        args (list): список аргументов.
+
+    Returns:
+        tuple: (текст ответа, нужно_ли_закрыть_окно).
+    """
     if command == "exit":
         return "Выход.", True
     elif command == "ls":
@@ -23,43 +42,65 @@ def run_command(command, args):
     else:
         return "Ошибка: неизвестная команда '" + command + "'", False
 
-
 def parse_args():
+    """
+    Разбирает параметры командной строки.
+
+    Returns:
+        argparse.Namespace: объект с полями vfs, log, script.
+    """
     parser = argparse.ArgumentParser(
-        description="Эмулятор оболочки ОС"
-    )
+        description="Эмулятор оболочки ОС")
     parser.add_argument(
         "--vfs",
         default=None,
-        help="Путь к файлу виртуальной файловой системы"
-    )
+        help="Путь к файлу виртуальной файловой системы")
     parser.add_argument(
         "--log",
         default=None,
-        help="Путь к лог-файлу (XML)"
-    )
+        help="Путь к лог-файлу (XML)")
     parser.add_argument(
         "--script",
         default=None,
-        help="Путь к стартовому скрипту"
-    )
+        help="Путь к стартовому скрипту")
     return parser.parse_args()
 
+def log_event(file_path, command, error=""):
+    """
+    Записывает событие вызова команды в XML-лог.
 
-def main():
+    Args:
+        file_path (str): путь к лог-файлу.
+        command (str): команда, которую вызвал пользователь.
+        error (str): текст ошибки (если была).
+    """
+    if not file_path:
+        return
+    try:
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+    except (FileNotFoundError, ET.ParseError):
+        root = ET.Element("log")
+        tree = ET.ElementTree(root)
+    event = ET.SubElement(root, "event")
+    cmd_elem = ET.SubElement(event, "command")
+    cmd_elem.text = command
+    time_elem = ET.SubElement(event, "timestamp")
+    time_elem.text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    err_elem = ET.SubElement(event, "error")
+    err_elem.text = error
+    tree.write(file_path, encoding="UTF-8", xml_declaration=True)
+    
+def main(log_path=None):
     user = getpass.getuser()
     host = socket.gethostname()
-
     root = tk.Tk()
     root.title("Эмулятор - [" + user + "@" + host + "]")
     root.geometry("700x500")
-
     output_1 = tk.Text(root, height=20, width=80)
     output_1.pack(padx=10, pady=10)
-
     input_1 = tk.Entry(root, width=80)
     input_1.pack(padx=10, pady=5)
-
     output_1.insert(tk.END, "Добро пожаловать!\n")
     output_1.insert(tk.END, "Доступные команды: ls, cd, exit\n")
     output_1.insert(tk.END, "\n")
@@ -67,29 +108,24 @@ def main():
     def on_run():
         line = input_1.get()
         input_1.delete(0, tk.END)
-
         if not line.strip():
             return
-
         command, args = parse_command(line)
         result, should_exit = run_command(command, args)
-
+        error_text = ""
+        if result.startswith("Ошибка"):
+            error_text = result
+        log_event(log_path, line, error_text)
         output_1.insert(tk.END, "> " + line + "\n")
         output_1.insert(tk.END, result + "\n\n")
         output_1.see(tk.END)
-
         if should_exit:
             root.destroy()
-
     run_1 = tk.Button(root, text="Выполнить", command=on_run)
     run_1.pack(pady=5)
-
     input_1.bind("<Return>", lambda event: on_run())
-
     input_1.focus()
-
     root.mainloop()
-
 
 if __name__ == "__main__":
     args = parse_args()
@@ -98,4 +134,4 @@ if __name__ == "__main__":
     print("Лог:", args.log)
     print("Скрипт:", args.script)
     print("=========================")
-    main()
+    main(args.log)

@@ -2,8 +2,9 @@ import tkinter as tk
 import getpass
 import socket
 import argparse
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as et
 from datetime import datetime
+
 
 def parse_command(line):
     """
@@ -21,6 +22,7 @@ def parse_command(line):
     command = parts[0]
     args = parts[1:]
     return command, args
+
 
 def run_command(command, args):
     """
@@ -42,6 +44,7 @@ def run_command(command, args):
     else:
         return "Ошибка: неизвестная команда '" + command + "'", False
 
+
 def parse_args():
     """
     Разбирает параметры командной строки.
@@ -50,20 +53,25 @@ def parse_args():
         argparse.Namespace: объект с полями vfs, log, script.
     """
     parser = argparse.ArgumentParser(
-        description="Эмулятор оболочки ОС")
+        description="Эмулятор оболочки ОС"
+    )
     parser.add_argument(
         "--vfs",
         default=None,
-        help="Путь к файлу виртуальной файловой системы")
+        help="Путь к файлу виртуальной файловой системы"
+    )
     parser.add_argument(
         "--log",
         default=None,
-        help="Путь к лог-файлу (XML)")
+        help="Путь к лог-файлу (XML)"
+    )
     parser.add_argument(
         "--script",
         default=None,
-        help="Путь к стартовому скрипту")
+        help="Путь к стартовому скрипту"
+    )
     return parser.parse_args()
+
 
 def log_event(file_path, command, error=""):
     """
@@ -76,56 +84,125 @@ def log_event(file_path, command, error=""):
     """
     if not file_path:
         return
+
     try:
-        tree = ET.parse(file_path)
+        tree = et.parse(file_path)
         root = tree.getroot()
-    except (FileNotFoundError, ET.ParseError):
-        root = ET.Element("log")
-        tree = ET.ElementTree(root)
-    event = ET.SubElement(root, "event")
-    cmd_elem = ET.SubElement(event, "command")
+    except (FileNotFoundError, et.ParseError):
+        root = et.Element("log")
+        tree = et.ElementTree(root)
+
+    event = et.SubElement(root, "event")
+
+    cmd_elem = et.SubElement(event, "command")
     cmd_elem.text = command
-    time_elem = ET.SubElement(event, "timestamp")
+
+    time_elem = et.SubElement(event, "timestamp")
     time_elem.text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    err_elem = ET.SubElement(event, "error")
+
+    err_elem = et.SubElement(event, "error")
     err_elem.text = error
+
     tree.write(file_path, encoding="UTF-8", xml_declaration=True)
-    
-def main(log_path=None):
+
+
+def run_script(path, output_field, root):
+    """
+    Читает стартовый скрипт и выполняет команды по очереди.
+
+    Останавливается при первой ошибке.
+
+    Args:
+        path (str): путь к файлу скрипта.
+        output_field: поле вывода Tkinter.
+        root: главное окно Tkinter.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        output_field.insert(tk.END, "Ошибка: файл скрипта не найден\n")
+        return
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        output_field.insert(tk.END, "> " + line + "\n")
+
+        command, args = parse_command(line)
+        result, should_exit = run_command(command, args)
+
+        output_field.insert(tk.END, result + "\n\n")
+        output_field.see(tk.END)
+
+        if result.startswith("Ошибка"):
+            output_field.insert(
+                tk.END,
+                "=== Скрипт остановлен: " + result + " ===\n\n"
+            )
+            output_field.see(tk.END)
+            return
+
+        if should_exit:
+            root.destroy()
+            return
+
+
+def main(log_path=None, script_path=None):
+    """Создаёт окно эмулятора и запускает цикл обработки событий."""
     user = getpass.getuser()
     host = socket.gethostname()
+
     root = tk.Tk()
     root.title("Эмулятор - [" + user + "@" + host + "]")
     root.geometry("700x500")
-    output_1 = tk.Text(root, height=20, width=80)
-    output_1.pack(padx=10, pady=10)
-    input_1 = tk.Entry(root, width=80)
-    input_1.pack(padx=10, pady=5)
-    output_1.insert(tk.END, "Добро пожаловать!\n")
-    output_1.insert(tk.END, "Доступные команды: ls, cd, exit\n")
-    output_1.insert(tk.END, "\n")
+
+    output_field = tk.Text(root, height=20, width=80)
+    output_field.pack(padx=10, pady=10)
+
+    input_field = tk.Entry(root, width=80)
+    input_field.pack(padx=10, pady=5)
+
+    output_field.insert(tk.END, "Добро пожаловать!\n")
+    output_field.insert(tk.END, "Доступные команды: ls, cd, exit\n")
+    output_field.insert(tk.END, "\n")
 
     def on_run():
-        line = input_1.get()
-        input_1.delete(0, tk.END)
+        """Срабатывает при нажатии кнопки или Enter."""
+        line = input_field.get()
+        input_field.delete(0, tk.END)
+
         if not line.strip():
             return
+
         command, args = parse_command(line)
         result, should_exit = run_command(command, args)
+
         error_text = ""
         if result.startswith("Ошибка"):
             error_text = result
         log_event(log_path, line, error_text)
-        output_1.insert(tk.END, "> " + line + "\n")
-        output_1.insert(tk.END, result + "\n\n")
-        output_1.see(tk.END)
+
+        output_field.insert(tk.END, "> " + line + "\n")
+        output_field.insert(tk.END, result + "\n\n")
+        output_field.see(tk.END)
+
         if should_exit:
             root.destroy()
-    run_1 = tk.Button(root, text="Выполнить", command=on_run)
-    run_1.pack(pady=5)
-    input_1.bind("<Return>", lambda event: on_run())
-    input_1.focus()
+
+    run_button = tk.Button(root, text="Выполнить", command=on_run)
+    run_button.pack(pady=5)
+    input_field.bind("<Return>", lambda event: on_run())
+
+    input_field.focus()
+
+    if script_path:
+        run_script(script_path, output_field, root)
+
     root.mainloop()
+
 
 if __name__ == "__main__":
     args = parse_args()
@@ -134,4 +211,4 @@ if __name__ == "__main__":
     print("Лог:", args.log)
     print("Скрипт:", args.script)
     print("=========================")
-    main(args.log)
+    main(args.log, args.script)

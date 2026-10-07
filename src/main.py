@@ -7,15 +7,6 @@ from datetime import datetime
 
 
 def parse_command(line):
-    """
-    Разбирает строку на команду и аргументы по пробелам.
-
-    Args:
-        line (str): строка ввода.
-
-    Returns:
-        tuple: (команда, список аргументов).
-    """
     parts = line.split()
     if not parts:
         return "", []
@@ -25,16 +16,6 @@ def parse_command(line):
 
 
 def run_command(command, args):
-    """
-    Выполняет команду. Пока — заглушки.
-
-    Args:
-        command (str): имя команды.
-        args (list): список аргументов.
-
-    Returns:
-        tuple: (текст ответа, нужно_ли_закрыть_окно).
-    """
     if command == "exit":
         return "Выход.", True
     elif command == "ls":
@@ -46,12 +27,6 @@ def run_command(command, args):
 
 
 def parse_args():
-    """
-    Разбирает параметры командной строки.
-
-    Returns:
-        argparse.Namespace: объект с полями vfs, log, script.
-    """
     parser = argparse.ArgumentParser(
         description="Эмулятор оболочки ОС"
     )
@@ -74,14 +49,6 @@ def parse_args():
 
 
 def log_event(file_path, command, error=""):
-    """
-    Записывает событие вызова команды в XML-лог.
-
-    Args:
-        file_path (str): путь к лог-файлу.
-        command (str): команда, которую вызвал пользователь.
-        error (str): текст ошибки (если была).
-    """
     if not file_path:
         return
 
@@ -107,16 +74,6 @@ def log_event(file_path, command, error=""):
 
 
 def run_script(path, output_field, root):
-    """
-    Читает стартовый скрипт и выполняет команды по очереди.
-
-    Останавливается при первой ошибке.
-
-    Args:
-        path (str): путь к файлу скрипта.
-        output_field: поле вывода Tkinter.
-        root: главное окно Tkinter.
-    """
     try:
         with open(path, "r", encoding="utf-8") as f:
             lines = f.readlines()
@@ -151,7 +108,6 @@ def run_script(path, output_field, root):
 
 
 def main(log_path=None, script_path=None):
-    """Создаёт окно эмулятора и запускает цикл обработки событий."""
     user = getpass.getuser()
     host = socket.gethostname()
 

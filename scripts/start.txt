@@ -1,4 +1,8 @@
-ls -l
-cd /home
 ls
+ls -l
+ls -l -a
+cd /
+cd /home
+cd /home/user
+cd ..
 exit

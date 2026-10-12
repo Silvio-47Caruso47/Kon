@@ -57,6 +57,56 @@ def log_event(file_path, command, error=""):
     err_elem = et.SubElement(event, "error")
     err_elem.text = error
     tree.write(file_path, encoding="UTF-8", xml_declaration=True)
+    
+def xml_to_dict(element):
+    name = element.get("name", "")
+    tag = element.tag
+    if tag == "file":
+        content_elem = element.find("content")
+        content = content_elem.text if content_elem is not None else ""
+        return {
+            "type": "file",
+            "content": content}
+    elif tag == "dir":
+        children = {}
+        for child in element:
+            child_dict = xml_to_dict(child)
+            children[child.get("name", "")] = child_dict
+        return {
+            "type": "dir",
+            "name": name,
+            "children": children}
+    return None
+
+def load_vfs(path):
+    if not path:
+        return None
+    try:
+        tree = et.parse(path)
+        root = tree.getroot()
+    except FileNotFoundError:
+        print("Ошибка: файл VFS не найден:", path)
+        return None
+    except et.ParseError:
+        print("Ошибка: неверный формат VFS:", path)
+        return None
+    root_dir = root.find("dir")
+    if root_dir is None:
+        print("Ошибка: неверная структура VFS (нет корневой папки)")
+        return None
+    return xml_to_dict(root_dir)
+
+
+def get_motd(vfs):
+    if not vfs:
+        return None
+    if vfs.get("type") != "dir":
+        return None
+    children = vfs.get("children", {})
+    motd = children.get("motd")
+    if motd and motd.get("type") == "file":
+        return motd.get("content")
+    return None
 
 def run_script(path, output_field, root):
     try:
@@ -84,9 +134,10 @@ def run_script(path, output_field, root):
             root.destroy()
             return
 
-def main(log_path=None, script_path=None):
+def main(log_path=None, script_path=None, vfs_path=None):
     user = getpass.getuser()
     host = socket.gethostname()
+    vfs = load_vfs(vfs_path)
     root = tk.Tk()
     root.title("Эмулятор - [" + user + "@" + host + "]")
     root.geometry("700x500")
@@ -94,6 +145,9 @@ def main(log_path=None, script_path=None):
     output_field.pack(padx=10, pady=10)
     input_field = tk.Entry(root, width=80)
     input_field.pack(padx=10, pady=5)
+    motd = get_motd(vfs)
+    if motd:
+        output_field.insert(tk.END, motd + "\n\n")
     output_field.insert(tk.END, "Добро пожаловать!\n")
     output_field.insert(tk.END, "Доступные команды: ls, cd, exit\n")
     output_field.insert(tk.END, "\n")
@@ -129,4 +183,4 @@ if __name__ == "__main__":
     print("Лог:", args.log)
     print("Скрипт:", args.script)
     print("=========================")
-    main(args.log, args.script)
+    main(args.log, args.script, args.vfs)

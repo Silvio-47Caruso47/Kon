@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vfs>
+  <dir name="/">
+    <file name="motd">
+      <content>Глубокий VFS</content>
+    </file>
+    <dir name="home">
+      <dir name="user">
+        <dir name="docs">
+          <file name="note.txt">
+            <content>Заметка</content>
+          </file>
+          <file name="todo.txt">
+            <content>Список дел</content>
+          </file>
+        </dir>
+        <file name="readme.txt">
+          <content>Прочти меня</content>
+        </file>
+      </dir>
+    </dir>
+  </dir>
+</vfs>

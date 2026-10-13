@@ -11,8 +11,8 @@
 
 Реализованные команды:
 
-- `ls` — заглушка, выводит своё имя и аргументы.
-- `cd` — заглушка, выводит своё имя и аргументы.
+- `ls` — выводит содержимое папки.
+- `cd` — переходит в другую папку.
 - `exit` — закрывает приложение.
 
 Дополнительные возможности:
@@ -20,46 +20,73 @@
 - Приём параметров командной строки (`--vfs`, `--log`, `--script`).
 - Логирование всех команд в XML-файл.
 - Выполнение стартового скрипта при запуске.
+- Загрузка виртуальной файловой системы (VFS) из XML.
+- Вывод сообщения из файла `motd` при старте.
+
+## Виртуальная файловая система (VFS)
+
+VFS загружается из XML-файла и хранится в памяти программы.
+Изменения VFS не сохраняются на диск.
+
+Формат VFS:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<vfs>
+  <dir name="/">
+    <file name="motd">
+      <content>Добро пожаловать!</content>
+    </file>
+    <dir name="home">
+      <file name="user.txt">
+        <content>Данные</content>
+      </file>
+    </dir>
+  </dir>
+</vfs>
+```
+
+Если в корне VFS есть файл `motd`, его содержимое выводится
+в начале работы.
 
 ## Описание функций и настроек
 
-### Функции
+**`parse_command(line)`** — разбирает строку на команду и аргументы.
 
-**`parse_command(line)`** — разбирает строку на команду и аргументы
-по пробелам.
-
-**`run_command(command, args)`** — выполняет команду. Возвращает
-пару: текст ответа и флаг «закрыть окно».
+**`run_command(command, args, vfs)`** — выполняет команду.
 
 **`parse_args()`** — разбирает параметры командной строки.
 
-**`log_event(file_path, command, error)`** — записывает событие вызова
-команды в XML-лог.
+**`log_event(file_path, command, error)`** — пишет событие в XML-лог.
 
-**`run_script(path, output_field, root)`** — читает стартовый скрипт
-и выполняет команды по очереди. Останавливается при первой ошибке.
+**`xml_to_dict(element)`** — превращает XML-элемент в словарь.
 
-**`main(log_path, script_path)`** — создаёт окно, размещает элементы
-и запускает цикл событий.
+**`load_vfs(path)`** — загружает VFS из XML-файла.
+
+**`get_motd(vfs)`** — ищет файл motd в корне VFS.
+
+**`get_node(vfs, path)`** — ищет папку или файл по пути.
+
+**`run_script(path, output_field, root, vfs)`** — выполняет стартовый скрипт.
+
+**`main(log_path, script_path, vfs_path)`** — создаёт окно.
 
 ### Параметры командной строки
 
-- `--vfs` — путь к файлу виртуальной файловой системы.
-- `--log` — путь к лог-файлу (XML).
+- `--vfs` — путь к файлу VFS.
+- `--log` — путь к лог-файлу.
 - `--script` — путь к стартовому скрипту.
 
 ### Настройки окна
 
-- Заголовок формируется автоматически: `Эмулятор - [username@hostname]`.
-- Размер окна: 700x500 пикселей.
+- Заголовок: `Эмулятор - [username@hostname]`.
+- Размер: 700x500.
 - Поле вывода: 20 строк, 80 символов.
 - Поле ввода: 80 символов.
 
 ## Команды для сборки и запуска
 
-Требуется Python 3.10+ (проверено на 3.13).
-Дополнительные библиотеки устанавливать не нужно —
-все используемые модули встроены в Python.
+Требуется Python 3.10+.
 
 ### Запуск без параметров
 
@@ -67,81 +94,66 @@
 python src/main.py
 ```
 
-### Запуск с логированием
+### Запуск с VFS
 
 ```
-python src/main.py --log logs/test.xml
+python src/main.py --vfs vfs_files.xml
 ```
 
-### Запуск со стартовым скриптом
+### Запуск с VFS и скриптом
 
 ```
-python src/main.py --script scripts/start.txt
+python src/main.py --vfs vfs_deep.xml --script scripts/start.txt
 ```
 
-### Запуск со всеми параметрами
-
-```
-python src/main.py --vfs vfs.xml --log logs/test.xml --script scripts/start.txt
-```
-
-### Запуск через .bat файлы (Windows)
-
-Дважды кликните по одному из файлов:
+### Запуск через .bat
 
 - `run.bat` — обычный запуск.
-- `run_basic.bat` — запуск без параметров.
-- `run_script.bat` — запуск со стартовым скриптом.
-- `run_log.bat` — запуск с логированием.
-- `run_full.bat` — запуск со всеми параметрами.
+- `run_vfs_minimal.bat` — минимальный VFS.
+- `run_vfs_files.bat` — VFS с файлами.
+- `run_vfs_deep.bat` — глубокий VFS.
 
 ## Примеры использования
 
-### Пример 1. Запуск без параметров
+### Пример 1. Минимальный VFS
 
 ```
-python src/main.py
+python src/main.py --vfs vfs_minimal.xml
 ```
 
-Пользователь вводит команды вручную:
+В окне при вводе `ls` выводится `(пусто)`.
+
+### Пример 2. VFS с файлами
 
 ```
-> ls -l -a
-ls
--l -a
-
-> cd /home
-cd
-/home
-
-> asdf
-Ошибка: неизвестная команда 'asdf'
-
-> exit
-Выход.
+python src/main.py --vfs vfs_files.xml
 ```
 
-### Пример 2. Запуск со стартовым скриптом
+При старте — «Добро пожаловать!» (motd).
 
-Создайте файл `scripts/start.txt`:
-
-```
-ls -l
-cd /home
-ls
-exit
-```
-
-Запустите:
+Команды:
 
 ```
-python src/main.py --script scripts/start.txt
+> ls
+motd  readme.txt  home
+
+> ls home
+user.txt
+
+> cd home
+> ls
+user.txt
 ```
 
-Команды выполнятся автоматически. При первой ошибке —
-скрипт остановится.
+### Пример 3. Глубокий VFS
 
-### Пример 3. Логирование в XML
+```
+python src/main.py --vfs vfs_deep.xml --script scripts/start.txt
+```
+
+Motd «Глубокий VFS», потом выполняются команды из скрипта.
+
+### Пример 4. Логирование
 
 ```
 python src/main.py --log test.xml
@@ -150,17 +162,11 @@ python src/main.py --log test.xml
 Все команды записываются в `test.xml`:
 
 ```xml
-<?xml version='1.0' encoding='UTF-8'?>
 <log>
   <event>
-    <command>ls -l</command>
-    <timestamp>2026-10-06 14:23:11</timestamp>
+    <command>ls</command>
+    <timestamp>2026-10-13 14:23:11</timestamp>
     <error />
-  </event>
-  <event>
-    <command>asdf</command>
-    <timestamp>2026-10-06 14:23:15</timestamp>
-    <error>Ошибка: неизвестная команда 'asdf'</error>
   </event>
 </log>
 ```

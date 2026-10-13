@@ -1,0 +1,4 @@
+ls
+asdf
+ls
+exit

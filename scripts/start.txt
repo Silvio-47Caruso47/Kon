@@ -1,4 +1,8 @@
-ls -l
-cd /home
 ls
+ls home
+cd home
+ls
+cat user.txt
+cd ..
+tree
 exit

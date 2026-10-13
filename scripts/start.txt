@@ -5,4 +5,7 @@ ls
 cat user.txt
 cd ..
 tree
+touch test.txt
+ls
+chmod 755 test.txt
 exit

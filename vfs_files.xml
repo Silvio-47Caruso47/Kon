@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vfs>
+  <dir name="/">
+    <file name="motd">
+      <content>Добро пожаловать!</content>
+    </file>
+    <file name="readme.txt">
+      <content>Это readme-файл</content>
+    </file>
+    <file name="notes.txt">
+      <content>Мои заметки</content>
+    </file>
+    <dir name="home">
+      <file name="user.txt">
+        <content>Данные пользователя</content>
+      </file>
+    </dir>
+  </dir>
+</vfs>

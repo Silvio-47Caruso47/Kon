@@ -6,6 +6,8 @@ import xml.etree.ElementTree as et
 from datetime import datetime
 
 current_path = "/"
+PERMS_LENGTH = 3
+
 
 def parse_command(line):
     parts = line.split()
@@ -14,6 +16,7 @@ def parse_command(line):
     command = parts[0]
     args = parts[1:]
     return command, args
+
 
 def get_node(vfs, path):
     if not vfs or not path:
@@ -29,6 +32,7 @@ def get_node(vfs, path):
             return None
         node = children[part]
     return node
+
 
 def build_tree(node, prefix=""):
     lines = []
@@ -52,123 +56,136 @@ def build_tree(node, prefix=""):
             lines.append(prefix + branch + name)
     return "\n".join(lines)
 
-def run_command(command, args, vfs):
+
+def make_abs_path(name):
+    if name.startswith("/"):
+        return name
+    if current_path == "/":
+        return "/" + name
+    return current_path + "/" + name
+
+
+def cmd_ls(vfs, args):
+    target = current_path
+    if args:
+        target = args[0]
+    node = get_node(vfs, target)
+    if node is None:
+        return "Ошибка: папка не найдена", False
+    if node.get("type") != "dir":
+        return "Ошибка: это не папка", False
+    children = node.get("children", {})
+    if not children:
+        return "(пусто)", False
+    names = list(children.keys())
+    return "  ".join(names), False
+
+
+def cmd_cd(vfs, args):
     global current_path
+    if not args:
+        current_path = "/"
+        return "", False
+    target = args[0]
+    if target == "..":
+        parts = current_path.strip("/").split("/")
+        parts = [p for p in parts if p]
+        if parts:
+            parts.pop()
+        new_path = "/" + "/".join(parts)
+    elif target.startswith("/"):
+        new_path = target
+    else:
+        new_path = make_abs_path(target)
+    node = get_node(vfs, new_path)
+    if node is None:
+        return "Ошибка: папка не найдена", False
+    if node.get("type") != "dir":
+        return "Ошибка: это не папка", False
+    current_path = new_path
+    return "", False
+
+
+def cmd_cat(vfs, args):
+    if not args:
+        return "Ошибка: укажите файл", False
+    target = make_abs_path(args[0])
+    node = get_node(vfs, target)
+    if node is None:
+        return "Ошибка: файл не найден", False
+    if node.get("type") != "file":
+        return "Ошибка: это не файл", False
+    return node.get("content", ""), False
+
+
+def cmd_tree(vfs, args):
+    if vfs is None:
+        return "Ошибка: VFS не загружена", False
+    if vfs.get("type") != "dir":
+        return "Ошибка: VFS не папка", False
+    body = build_tree(vfs)
+    if not body:
+        return "(пусто)", False
+    return "/\n" + body, False
+
+
+def cmd_touch(vfs, args):
+    if not args:
+        return "Ошибка: укажите имя файла", False
+    name = args[0]
+    if "/" in name:
+        return "Ошибка: имя не должно содержать /", False
+    parent = get_node(vfs, current_path)
+    if parent is None or parent.get("type") != "dir":
+        return "Ошибка: текущая папка не найдена", False
+    children = parent.get("children", {})
+    if name in children:
+        return "Ошибка: файл уже существует", False
+    children[name] = {
+        "type": "file",
+        "content": "",
+        "permissions": "644"}
+    return "", False
+
+
+def cmd_chmod(vfs, args):
+    if len(args) < 2:
+        return "Ошибка: укажите права и файл", False
+    perms = args[0]
+    name = args[1]
+    if not perms.isdigit() or len(perms) != PERMS_LENGTH:
+        return "Ошибка: права должны быть 3 цифры", False
+    for ch in perms:
+        if ch not in "01234567":
+            return "Ошибка: неверные права", False
+    target = make_abs_path(name)
+    node = get_node(vfs, target)
+    if node is None:
+        return "Ошибка: файл не найден", False
+    if node.get("type") != "file":
+        return "Ошибка: это не файл", False
+    node["permissions"] = perms
+    return "", False
+
+
+def run_command(command, args, vfs):
     if command == "exit":
         return "Выход.", True
     elif command == "ls":
-        target = current_path
-        if args:
-            target = args[0]
-        node = get_node(vfs, target)
-        if node is None:
-            return "Ошибка: папка не найдена", False
-        if node.get("type") != "dir":
-            return "Ошибка: это не папка", False
-        children = node.get("children", {})
-        if not children:
-            return "(пусто)", False
-        names = list(children.keys())
-        return "  ".join(names), False
+        return cmd_ls(vfs, args)
     elif command == "cd":
-        if not args:
-            current_path = "/"
-            return "", False
-        target = args[0]
-        if target == "..":
-            parts = current_path.strip("/").split("/")
-            parts = [p for p in parts if p]
-            if parts:
-                parts.pop()
-            new_path = "/" + "/".join(parts)
-        elif target.startswith("/"):
-            new_path = target
-        else:
-            if current_path == "/":
-                new_path = "/" + target
-            else:
-                new_path = current_path + "/" + target
-        node = get_node(vfs, new_path)
-        if node is None:
-            return "Ошибка: папка не найдена", False
-        if node.get("type") != "dir":
-            return "Ошибка: это не папка", False
-        current_path = new_path
-        return "", False
+        return cmd_cd(vfs, args)
     elif command == "cat":
-        if not args:
-            return "Ошибка: укажите файл", False
-        target = args[0]
-        if not target.startswith("/"):
-            if current_path == "/":
-                target = "/" + target
-            else:
-                target = current_path + "/" + target
-        node = get_node(vfs, target)
-        if node is None:
-            return "Ошибка: файл не найден", False
-        if node.get("type") != "file":
-            return "Ошибка: это не файл", False
-        return node.get("content", ""), False
+        return cmd_cat(vfs, args)
     elif command == "tree":
-        if vfs is None:
-            return "Ошибка: VFS не загружена", False
-        if vfs.get("type") != "dir":
-            return "Ошибка: VFS не папка", False
-        body = build_tree(vfs)
-        if not body:
-            return "(пусто)", False
-        return "/\n" + body, False
+        return cmd_tree(vfs, args)
     elif command == "touch":
-        if not args:
-            return "Ошибка: укажите имя файла", False
-        name = args[0]
-        if "/" in name:
-            return "Ошибка: имя не должно содержать /", False
-        parent = get_node(vfs, current_path)
-        if parent is None:
-            return "Ошибка: текущая папка не найдена", False
-        if parent.get("type") != "dir":
-            return "Ошибка: текущая папка не найдена", False
-        children = parent.get("children", {})
-        if name in children:
-            return "Ошибка: файл уже существует", False
-        children[name] = {
-            "type": "file",
-            "content": "",
-            "permissions": "644"}
-        return "", False
+        return cmd_touch(vfs, args)
     elif command == "chmod":
-        if len(args) < 2:
-            return "Ошибка: укажите права и файл", False
-
-        perms = args[0]
-        name = args[1]
-
-        if not perms.isdigit() or len(perms) != 3:
-            return "Ошибка: права должны быть 3 цифры", False
-
-        for ch in perms:
-            if ch not in "01234567":
-                return "Ошибка: неверные права", False
-
-        target = name
-        if not target.startswith("/"):
-            if current_path == "/":
-                target = "/" + target
-            else:
-                target = current_path + "/" + target
-
-        node = get_node(vfs, target)
-        if node is None:
-            return "Ошибка: файл не найден", False
-        if node.get("type") != "file":
-            return "Ошибка: это не файл", False
-
-        node["permissions"] = perms
-        return "", False
+        return cmd_chmod(vfs, args)
     else:
         return "Ошибка: неизвестная команда '" + command + "'", False
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -187,6 +204,7 @@ def parse_args():
         help="Путь к стартовому скрипту")
     return parser.parse_args()
 
+
 def log_event(file_path, command, error=""):
     if not file_path:
         return
@@ -204,7 +222,8 @@ def log_event(file_path, command, error=""):
     err_elem = et.SubElement(event, "error")
     err_elem.text = error
     tree.write(file_path, encoding="UTF-8", xml_declaration=True)
-    
+
+
 def xml_to_dict(element):
     name = element.get("name", "")
     tag = element.tag
@@ -226,6 +245,7 @@ def xml_to_dict(element):
             "children": children}
     return None
 
+
 def load_vfs(path):
     if not path:
         return None
@@ -244,6 +264,7 @@ def load_vfs(path):
         return None
     return xml_to_dict(root_dir)
 
+
 def get_motd(vfs):
     if not vfs:
         return None
@@ -254,6 +275,7 @@ def get_motd(vfs):
     if motd and motd.get("type") == "file":
         return motd.get("content")
     return None
+
 
 def run_script(path, output_field, root, vfs):
     try:
@@ -281,23 +303,30 @@ def run_script(path, output_field, root, vfs):
             root.destroy()
             return
 
+
 def main(log_path=None, script_path=None, vfs_path=None):
     user = getpass.getuser()
     host = socket.gethostname()
     vfs = load_vfs(vfs_path)
+
     root = tk.Tk()
     root.title("Эмулятор - [" + user + "@" + host + "]")
     root.geometry("700x500")
+
     output_field = tk.Text(root, height=20, width=80)
     output_field.pack(padx=10, pady=10)
+
     input_field = tk.Entry(root, width=80)
     input_field.pack(padx=10, pady=5)
+
     motd = get_motd(vfs)
     if motd:
         output_field.insert(tk.END, motd + "\n\n")
+
     output_field.insert(tk.END, "Добро пожаловать!\n")
-    output_field.insert(tk.END, "Доступные команды: ls, cd, exit\n")
+    output_field.insert(tk.END, "Команды: ls, cd, cat, tree, touch, chmod, exit\n")
     output_field.insert(tk.END, "\n")
+
     def on_run():
         line = input_field.get()
         input_field.delete(0, tk.END)
@@ -321,6 +350,7 @@ def main(log_path=None, script_path=None, vfs_path=None):
     if script_path:
         run_script(script_path, output_field, root, vfs)
     root.mainloop()
+
 
 if __name__ == "__main__":
     args = parse_args()

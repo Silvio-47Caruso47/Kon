@@ -7,6 +7,7 @@ from datetime import datetime
 
 current_path = "/"
 PERMS_LENGTH = 3
+CHMOD_MIN_ARGS = 2
 
 
 def parse_command(line):
@@ -149,7 +150,7 @@ def cmd_touch(vfs, args):
 
 
 def cmd_chmod(vfs, args):
-    if len(args) < 2:
+    if len(args) < CHMOD_MIN_ARGS:
         return "Ошибка: укажите права и файл", False
     perms = args[0]
     name = args[1]
@@ -304,10 +305,9 @@ def run_script(path, output_field, root, vfs):
             return
 
 
-def main(log_path=None, script_path=None, vfs_path=None):
+def create_window(log_path, vfs):
     user = getpass.getuser()
     host = socket.gethostname()
-    vfs = load_vfs(vfs_path)
 
     root = tk.Tk()
     root.title("Эмулятор - [" + user + "@" + host + "]")
@@ -324,7 +324,10 @@ def main(log_path=None, script_path=None, vfs_path=None):
         output_field.insert(tk.END, motd + "\n\n")
 
     output_field.insert(tk.END, "Добро пожаловать!\n")
-    output_field.insert(tk.END, "Команды: ls, cd, cat, tree, touch, chmod, exit\n")
+    output_field.insert(
+        tk.END,
+        "Команды: ls, cd, cat, tree, touch, chmod, exit\n"
+    )
     output_field.insert(tk.END, "\n")
 
     def on_run():
@@ -343,12 +346,21 @@ def main(log_path=None, script_path=None, vfs_path=None):
         output_field.see(tk.END)
         if should_exit:
             root.destroy()
+
     run_button = tk.Button(root, text="Выполнить", command=on_run)
     run_button.pack(pady=5)
     input_field.bind("<Return>", lambda event: on_run())
     input_field.focus()
+    return root, output_field
+
+
+def main(log_path=None, script_path=None, vfs_path=None):
+    vfs = load_vfs(vfs_path)
+    root, output_field = create_window(log_path, vfs)
+
     if script_path:
         run_script(script_path, output_field, root, vfs)
+
     root.mainloop()
 
 

@@ -308,28 +308,21 @@ def run_script(path, output_field, root, vfs):
 def create_window(log_path, vfs):
     user = getpass.getuser()
     host = socket.gethostname()
-
     root = tk.Tk()
     root.title("Эмулятор - [" + user + "@" + host + "]")
     root.geometry("700x500")
-
     output_field = tk.Text(root, height=20, width=80)
     output_field.pack(padx=10, pady=10)
-
     input_field = tk.Entry(root, width=80)
     input_field.pack(padx=10, pady=5)
-
     motd = get_motd(vfs)
     if motd:
         output_field.insert(tk.END, motd + "\n\n")
-
     output_field.insert(tk.END, "Добро пожаловать!\n")
     output_field.insert(
         tk.END,
-        "Команды: ls, cd, cat, tree, touch, chmod, exit\n"
-    )
+        "Команды: ls, cd, cat, tree, touch, chmod, exit\n")
     output_field.insert(tk.END, "\n")
-
     def on_run():
         line = input_field.get()
         input_field.delete(0, tk.END)
@@ -346,7 +339,6 @@ def create_window(log_path, vfs):
         output_field.see(tk.END)
         if should_exit:
             root.destroy()
-
     run_button = tk.Button(root, text="Выполнить", command=on_run)
     run_button.pack(pady=5)
     input_field.bind("<Return>", lambda event: on_run())
